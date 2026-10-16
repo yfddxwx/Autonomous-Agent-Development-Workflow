@@ -1,0 +1,70 @@
+{
+  "active_profile_id": "deepseek-flash",
+  "profiles": [
+    {
+      "id": "deepseek-flash",
+      "name": "DeepSeek V4.1 Flash",
+      "provider": "deepseek",
+      "base_url": "https://api.deepseek.com",
+      "api_key": "YOUR_DEEPSEEK_API_KEY",
+      "model": "deepseek-flash",
+      "max_steps": 15
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro",
+      "provider": "deepseek",
+      "base_url": "https://api.deepseek.com",
+      "api_key": "YOUR_DEEPSEEK_API_KEY",
+      "model": "deepseek-v4-pro",
+      "max_steps": 15
+    },
+    {
+      "id": "mimo-v2.6-flash",
+      "name": "Xiaomi MiMo V2.6 Flash",
+      "provider": "xiaomi",
+      "base_url": "https://api.xiaomimimo.com/v1",
+      "api_key": "YOUR_XIAOMI_API_KEY",
+      "model": "mimo-v2.6-flash",
+      "max_steps": 15
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Google Gemini 2.5 Flash",
+      "provider": "google",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "api_key": "YOUR_GEMINI_API_KEY",
+      "model": "gemini-2.5-flash",
+      "max_steps": 15
+    },
+    {
+      "id": "claude-3-7-sonnet",
+      "name": "Claude 3.7 Sonnet",
+      "provider": "anthropic",
+      "base_url": "https://api.anthropic.com/v1",
+      "api_key": "YOUR_ANTHROPIC_API_KEY",
+      "model": "claude-3-7-sonnet-latest",
+      "max_steps": 15
+    },
+    {
+      "id": "gpt-4o",
+      "name": "OpenAI GPT-4o",
+      "provider": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "YOUR_OPENAI_API_KEY",
+      "model": "gpt-4o",
+      "max_steps": 15
+    },
+    {
+      "id": "ollama",
+      "name": "Local Ollama (Llama 3.3)",
+      "provider": "ollama",
+      "base_url": "http://localhost:11434/v1",
+      "api_key": "",
+      "model": "llama3.3",
+      "max_steps": 15
+    }
+  ],
+  "workspace_dir": ".",
+  "approval_mode": "guarded"
+}

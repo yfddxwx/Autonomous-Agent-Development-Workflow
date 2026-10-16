@@ -1,0 +1,49 @@
+# Binaries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+agent.exe
+bin/
+dist/
+build/
+
+# Private credentials and runtime configuration
+# WARNING: Do NOT commit active configuration with real API keys
+config.json
+
+# Development logs (Excluded per repository specification)
+AGENT_DEV_LOG.md
+
+# Runtime session history and cache
+.agent/sessions/
+
+# Log files
+*.log
+run.log
+
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Test coverage and profiling
+*.out
+*.test
+coverage.txt
+profile.pprof
+
+# Temporary and scratch files
+tmp/
+temp/
+*.tmp

@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevAgent - Autonomous Coding Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/marked.min.js"></script>
+  <script>
+    if (typeof marked === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"><\/script>');
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #131314;
+      color: #e3e3e3;
+    }
+    pre, code {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    /* Google Material scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #37393b; border-radius: 9999px; }
+    /* Hide horizontal scrollbar but allow touch/trackpad scroll */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Google AI Gradient Sparkle */
+    .gemini-gradient {
+      background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%);
+    }
+    .gemini-text-gradient {
+      background: linear-gradient(135deg, #8ab4f8 0%, #c5b3f8 50%, #f28b82 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    /* Subtle pulse animation */
+    @keyframes subtle-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .animate-subtle {
+      animation: subtle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- Top App Bar (Google Material 3 Header) -->
+  <header class="h-16 bg-[#131314]/95 backdrop-blur-md border-b border-[#282a2c] px-4 flex items-center justify-between z-20 flex-shrink-0 gap-3 overflow-x-auto no-scrollbar">
+    <div class="flex items-center space-x-2.5 min-w-0 flex-shrink-0">
+      <!-- Session Drawer Toggle Button -->
+      <button id="btn-toggle-drawer" class="w-8 h-8 rounded-full hover:bg-[#282a2c] flex items-center justify-center text-[#c4c7c5] hover:text-[#8ab4f8] transition cursor-pointer flex-shrink-0" title="查看历史会话列表">
+        <i class="fa-solid fa-bars text-sm"></i>
+      </button>
+
+      <!-- Gemini Sparkle Icon -->
+      <div class="w-8 h-8 rounded-xl gemini-gradient flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white flex-shrink-0">
+        <i class="fa-solid fa-sparkles text-xs"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-1.5">
+          <span class="font-medium text-sm tracking-tight text-[#e3e3e3]">DevAgent</span>
+          <span class="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#1e1f20] text-[#8ab4f8] border border-[#37393b]">Go v1.22</span>
+        </div>
+        <!-- Workspace Pill Button -->
+        <button id="btn-switch-workspace" class="flex items-center gap-1 text-xs text-[#8e918f] hover:text-[#8ab4f8] hover:bg-[#1e1f20] rounded-full px-1.5 py-0.5 transition cursor-pointer mt-0.5 max-w-[140px] sm:max-w-[200px]" title="点击更换工作空间目录">
+          <i class="fa-regular fa-folder-open text-[#8ab4f8] text-[10px] flex-shrink-0"></i>
+          <span id="workspace-path" class="truncate font-mono text-[10px] text-[#c4c7c5]">加载中...</span>
+          <i class="fa-solid fa-pen-to-square text-[8px] text-[#8e918f] flex-shrink-0"></i>
+        </button>
+      </div>
+
+      <!-- Git Awareness Pill -->
+      <div id="git-widget" class="hidden items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-[#1e1f20] border border-[#37393b] text-xs flex-shrink-0">
+        <i class="fa-brands fa-git-alt text-[#fdd663] text-xs"></i>
+        <span id="git-status-text" class="text-[#c4c7c5] font-mono text-[10px] whitespace-nowrap">Git: 干净</span>
+        <button id="btn-git-rollback" class="hidden ml-1 px-1.5 py-0.2 rounded-full bg-[#f28b82]/15 hover:bg-[#f28b82]/25 text-[#f28b82] border border-[#f28b82]/30 text-[9px] font-medium transition cursor-pointer" title="一键丢弃修改并回滚到最近提交">
+          <i class="fa-solid fa-rotate-left mr-0.5"></i> 回滚
+        </button>
+      </div>
+    </div>
+
+    <!-- Status & Action Chips -->
+    <div class="flex items-center space-x-2 flex-shrink-0">
+      <!-- Token & Cost Telemetry Pill -->
+      <div id="token-telemetry-badge" class="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#1e1f20] border border-[#37393b] text-xs font-mono text-[#c4c7c5] flex-shrink-0" title="Token 消耗与估算成本 (按 DeepSeek 标准计费)">
+        <span class="flex items-center gap-1 text-[#fdd663]"><i class="fa-solid fa-coins text-[10px]"></i> <span id="telemetry-tokens">0 Tok</span></span>
+        <span class="text-[#4e5052]">|</span>
+        <span id="telemetry-cost" class="text-[#81c995] font-medium text-[11px]">¥0.0000</span>
+      </div>
+
+      <!-- Status Indicator Pill -->
+      <div id="status-indicator" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#1e1f20] border border-[#37393b] text-xs flex-shrink-0">
+        <span class="w-2 h-2 rounded-full bg-[#81c995] animate-pulse" id="status-dot"></span>
+        <span class="text-[#c4c7c5] font-medium text-xs whitespace-nowrap" id="status-text">空闲</span>
+      </div>
+
+      <!-- Antigravity Approval Mode Selector -->
+      <div class="relative flex-shrink-0">
+        <select id="approval-mode-select" class="appearance-none bg-[#1e1f20] hover:bg-[#282a2c] text-xs font-medium text-[#e3e3e3] border border-[#37393b] rounded-full pl-2.5 pr-6 py-1 focus:outline-none focus:border-[#8ab4f8] cursor-pointer max-w-[125px] sm:max-w-[145px] truncate transition" title="Antigravity 审核策略模式">
+          <option value="guarded">🛡️ 有限审核</option>
+          <option value="manual">🔒 人工审核</option>
+          <option value="auto">⚡ 完全自主</option>
+        </select>
+        <i class="fa-solid fa-chevron-down absolute right-2 top-2 text-[9px] text-[#8e918f] pointer-events-none"></i>
+      </div>
+
+      <!-- Session Snapshots Time-Travel Dropdown -->
+      <div class="relative flex-shrink-0">
+        <select id="session-snapshot-select" class="appearance-none bg-[#1e1f20] hover:bg-[#282a2c] text-xs font-medium text-[#e3e3e3] border border-[#37393b] rounded-full pl-2.5 pr-6 py-1 focus:outline-none focus:border-[#8ab4f8] cursor-pointer max-w-[115px] sm:max-w-[140px] truncate transition" title="会话分支树历史检查点与时间旅行">
+          <option value="">🌳 分支节点 (0)</option>
+        </select>
+        <i class="fa-solid fa-chevron-down absolute right-2 top-2 text-[9px] text-[#8e918f] pointer-events-none"></i>
+      </div>
+
+      <!-- Model Selector -->
+      <div class="relative flex-shrink-0">
+        <select id="model-select" class="appearance-none bg-[#1e1f20] hover:bg-[#282a2c] text-xs font-medium text-[#e3e3e3] border border-[#37393b] rounded-full pl-2.5 pr-6 py-1 focus:outline-none focus:border-[#8ab4f8] cursor-pointer max-w-[130px] sm:max-w-[170px] lg:max-w-[210px] truncate transition" title="当前调用模型">
+          <option value="deepseek-flash">DeepSeek V4.1 Flash</option>
+        </select>
+        <i class="fa-solid fa-chevron-down absolute right-2 top-2 text-[9px] text-[#8e918f] pointer-events-none"></i>
+      </div>
+
+      <!-- Prominent One-Click Session Reset Button -->
+      <button id="btn-reset-session" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1f20] hover:bg-[#282a2c] text-xs font-medium text-[#c4c7c5] hover:text-[#8ab4f8] border border-[#37393b] hover:border-[#8ab4f8]/50 transition cursor-pointer shadow-sm flex-shrink-0" title="一键重置当前会话 (清空上下文历史，开启新任务)">
+        <i class="fa-solid fa-rotate-left text-[10px] text-[#8ab4f8]"></i>
+        <span class="whitespace-nowrap">重置会话</span>
+      </button>
+
+      <!-- Settings Button -->
+      <button id="btn-settings" class="w-8 h-8 rounded-full hover:bg-[#282a2c] flex items-center justify-center text-[#c4c7c5] hover:text-[#8ab4f8] transition cursor-pointer flex-shrink-0" title="设置与模型管理">
+        <i class="fa-solid fa-sliders text-xs"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 flex flex-col h-[calc(100vh-64px)] relative overflow-hidden bg-[#131314]">
+    
+    <!-- Messages Scrollable View -->
+    <div id="messages-container" class="flex-1 overflow-y-auto px-4 py-8 space-y-6">
+      
+      <!-- Welcome Hero (Google Gemini Style) -->
+      <div id="welcome-hero" class="max-w-3xl mx-auto py-10 space-y-8 select-text">
+        <div class="space-y-2">
+          <h2 class="text-4xl font-normal gemini-text-gradient tracking-tight">Hello, Developer</h2>
+          <p class="text-slate-400 text-sm font-normal leading-relaxed">
+            我是运行在您本地机器上的单二进制自动化研发助理。具备 ReAct 深度思考、文件精准差异编辑、终端指令流式执行与人机安全审批门禁。今天想构建或调试什么？
+          </p>
+        </div>
+
+        <!-- Quick Start Prompt Chips (Google Material 3 Suggestions) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+          <button class="quick-prompt-card p-4 rounded-2xl bg-[#1e1f20] hover:bg-[#282a2c] border border-[#37393b] text-left transition cursor-pointer group">
+            <div class="text-xs font-medium text-[#8ab4f8] mb-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-code"></i> <span>快速创建应用</span>
+            </div>
+            <p class="text-xs text-[#c4c7c5] group-hover:text-white transition">制作一个带有优雅深色模式和待办事项的单文件 Web App</p>
+          </button>
+          <button class="quick-prompt-card p-4 rounded-2xl bg-[#1e1f20] hover:bg-[#282a2c] border border-[#37393b] text-left transition cursor-pointer group">
+            <div class="text-xs font-medium text-[#81c995] mb-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-folder-tree"></i> <span>探索工作区</span>
+            </div>
+            <p class="text-xs text-[#c4c7c5] group-hover:text-white transition">检索当前工作目录的文件结构，分析项目技术栈与依赖</p>
+          </button>
+          <button class="quick-prompt-card p-4 rounded-2xl bg-[#1e1f20] hover:bg-[#282a2c] border border-[#37393b] text-left transition cursor-pointer group">
+            <div class="text-xs font-medium text-[#fdd663] mb-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-vial-circle-check"></i> <span>自动化测试</span>
+            </div>
+            <p class="text-xs text-[#c4c7c5] group-hover:text-white transition">运行工程的所有单元测试，捕获失败用例并自主反思修复</p>
+          </button>
+          <button class="quick-prompt-card p-4 rounded-2xl bg-[#1e1f20] hover:bg-[#282a2c] border border-[#37393b] text-left transition cursor-pointer group">
+            <div class="text-xs font-medium text-[#c5b3f8] mb-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Pi 差异重构</span>
+            </div>
+            <p class="text-xs text-[#c4c7c5] group-hover:text-white transition">使用 file_edit 对指定函数进行微创级重构与解耦</p>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Antigravity Approval Card / Modal -->
+    <div id="approval-card" class="hidden mx-auto w-full max-w-3xl px-4 pb-3 z-30">
+      <div class="bg-[#1e1f20] border-2 border-[#fdd663]/60 rounded-3xl p-5 shadow-2xl backdrop-blur">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2.5 text-[#fdd663] font-medium text-sm">
+            <i class="fa-solid fa-shield-halved text-base"></i>
+            <span>安全审核拦截：需要人工确认执行</span>
+          </div>
+          <span class="text-xs px-2.5 py-0.5 bg-[#fdd663]/15 text-[#fdd663] rounded-full border border-[#fdd663]/30 font-mono" id="approval-tool-badge">cmd_exec</span>
+        </div>
+        <p class="text-xs text-[#c4c7c5] mb-2.5" id="approval-desc">Agent 正在请求执行敏感操作：</p>
+        <div id="approval-payload" class="bg-[#131314] p-3 rounded-2xl border border-[#37393b] text-xs text-[#81c995] font-mono overflow-x-auto max-h-48 mb-3.5 select-text"></div>
+        <div class="flex items-center justify-end space-x-2.5">
+          <input type="text" id="approval-reject-reason" placeholder="反馈意见（可选）..." class="flex-1 bg-[#131314] border border-[#37393b] text-xs rounded-full px-4 py-2 text-[#e3e3e3] focus:outline-none focus:border-[#8ab4f8]">
+          <button id="btn-reject-approval" class="px-5 py-2 rounded-full bg-[#f28b82]/15 hover:bg-[#f28b82]/25 text-[#f28b82] border border-[#f28b82]/30 text-xs font-medium transition cursor-pointer">
+            拒绝执行
+          </button>
+          <button id="btn-confirm-approval" class="px-5 py-2 rounded-full bg-[#81c995] hover:bg-[#a8dab5] text-[#001d35] text-xs font-medium transition shadow-md cursor-pointer">
+            批准放行
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Gemini Signature Input Bar -->
+    <div class="p-4 bg-gradient-to-t from-[#131314] via-[#131314]/90 to-transparent flex-shrink-0 z-10">
+      <div class="max-w-3xl mx-auto">
+        <!-- Floating Pill Container -->
+        <div class="relative bg-[#1e1f20] border border-[#37393b] focus-within:border-[#8ab4f8] focus-within:ring-2 focus-within:ring-[#8ab4f8]/20 rounded-[28px] shadow-2xl p-3 transition-all">
+          <textarea id="prompt-input" rows="1" placeholder="给 Agent 指派研发任务，例如：创建一个简易 Web API 并测试..." class="w-full bg-transparent text-[#e3e3e3] placeholder-[#8e918f] px-3 py-1.5 text-sm focus:outline-none resize-none max-h-36 leading-relaxed select-text"></textarea>
+          
+          <div class="flex items-center justify-between pt-2 px-1 border-t border-[#282a2c]/60 mt-1">
+            <!-- Left Info Chip -->
+            <div class="flex items-center space-x-2 text-[11px] text-[#8e918f]">
+              <span class="flex items-center gap-1 font-mono">
+                <i class="fa-solid fa-folder text-[10px] text-[#8ab4f8]"></i>
+                <span id="input-ws-hint" class="max-w-[180px] truncate">工作空间就绪</span>
+              </span>
+              <span class="text-[#37393b]">|</span>
+              <button id="btn-prompt-reset-session" type="button" class="hover:text-[#8ab4f8] flex items-center gap-1 text-[11px] text-[#8e918f] hover:underline transition cursor-pointer" title="一键清空重置当前会话">
+                <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                <span>清空重置</span>
+              </button>
+            </div>
+
+            <!-- Right Buttons -->
+            <div class="flex items-center space-x-2">
+              <!-- Thinking Level Selector Pill (Pi Agent Architecture) -->
+              <div class="relative" id="thinking-selector-wrapper">
+                <button id="btn-thinking-level" type="button" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#131314] hover:bg-[#282a2c] text-xs font-medium text-[#c4c7c5] hover:text-[#8ab4f8] border border-[#37393b] hover:border-[#8ab4f8]/50 transition cursor-pointer select-none" title="思考深度 (Reasoning Level)">
+                  <i class="fa-solid fa-brain text-[11px] text-[#9b72cb]" id="thinking-level-icon"></i>
+                  <span id="thinking-level-label">深度思考</span>
+                  <i class="fa-solid fa-chevron-down text-[8px] text-[#8e918f] ml-0.5" id="thinking-level-chevron"></i>
+                </button>
+                
+                <!-- Floating Upward Popover Menu -->
+                <div id="thinking-level-menu" class="hidden absolute bottom-full mb-2.5 right-0 w-72 bg-[#1e1f20] border border-[#37393b] rounded-2xl shadow-2xl p-2 z-30 space-y-1 backdrop-blur-md">
+                  <div class="px-2.5 py-1 text-[11px] font-semibold text-[#8e918f] uppercase tracking-wider border-b border-[#282a2c] flex items-center justify-between">
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-brain text-[#9b72cb]"></i> 思考深度 (Thinking)</span>
+                    <span class="text-[#8ab4f8] font-mono text-[10px] normal-case truncate max-w-[110px]" id="thinking-model-name"></span>
+                  </div>
+                  <div id="thinking-level-options" class="space-y-0.5 py-1">
+                    <!-- Populated dynamically via JS based on current model's supported levels -->
+                  </div>
+                </div>
+              </div>
+
+              <button id="btn-stop" class="hidden px-3 py-1 rounded-full bg-[#f28b82]/15 text-[#f28b82] hover:bg-[#f28b82]/25 text-xs font-medium transition flex items-center gap-1 cursor-pointer" title="停止生成">
+                <i class="fa-solid fa-stop text-[10px]"></i> <span>停止</span>
+              </button>
+              <button id="btn-send" class="w-8 h-8 rounded-full bg-[#8ab4f8] hover:bg-[#a8c7fa] text-[#001d35] flex items-center justify-center transition shadow-md disabled:opacity-30 disabled:hover:bg-[#8ab4f8] cursor-pointer" title="发送 (Enter)">
+                <i class="fa-solid fa-arrow-up text-sm font-bold"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtext Disclaimer -->
+        <div class="flex items-center justify-between text-[11px] text-[#8e918f] px-3 pt-2">
+          <span>Shift + Enter 换行，Enter 发送 • DevAgent 自动化研发助理</span>
+          <span id="session-token-count">0 字符</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Workspace Switcher Modal (Google Material 3 Dialog) -->
+  <div id="workspace-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#1e1f20] border border-[#37393b] rounded-[28px] w-full max-w-lg p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-[#282a2c] pb-3.5">
+        <div class="flex items-center gap-2.5 text-[#e3e3e3] font-medium text-base">
+          <div class="w-8 h-8 rounded-full bg-[#8ab4f8]/10 text-[#8ab4f8] flex items-center justify-center">
+            <i class="fa-solid fa-folder-open text-sm"></i>
+          </div>
+          <span>切换工作空间目录</span>
+        </div>
+        <button id="btn-close-ws-modal" class="w-8 h-8 rounded-full hover:bg-[#282a2c] text-[#8e918f] hover:text-[#e3e3e3] flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div>
+          <label class="block text-[#c4c7c5] font-medium mb-2">目标目录绝对路径</label>
+          <div class="relative">
+            <input type="text" id="ws-new-path" placeholder="例如: D:\my-projects\demo" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-4 py-3 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8] select-text">
+          </div>
+          
+          <!-- Native Folder Browser Trigger -->
+          <div class="pt-2.5">
+            <button type="button" id="btn-browse-folder" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#282a2c] hover:bg-[#313335] border border-[#37393b] text-[#e3e3e3] text-xs font-medium rounded-xl transition cursor-pointer shadow-sm">
+              <i class="fa-solid fa-folder-tree text-[#8ab4f8]"></i>
+              <span id="btn-browse-folder-text">唤起系统文件资源管理器选择目录</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-[#8e918f] mt-2 leading-relaxed">
+            支持原生中文路径、空格路径及任意物理磁盘。切换后 Agent 的代码读写与终端命令将立即重定向至此目录，无需重启服务。
+          </p>
+        </div>
+
+        <div id="ws-switch-error" class="hidden p-3 bg-[#f28b82]/10 border border-[#f28b82]/30 rounded-xl text-[#f28b82] text-xs"></div>
+      </div>
+
+      <div class="pt-2 flex justify-end space-x-2.5">
+        <button id="btn-cancel-ws" class="px-5 py-2.5 rounded-full hover:bg-[#282a2c] text-[#c4c7c5] hover:text-white text-xs font-medium transition cursor-pointer">取消</button>
+        <button id="btn-confirm-switch-ws" class="px-5 py-2.5 rounded-full bg-[#8ab4f8] hover:bg-[#a8c7fa] text-[#001d35] text-xs font-medium transition shadow-md cursor-pointer">切换并生效</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Drawer (Left Slide-in Panel) -->
+  <aside id="session-drawer" class="fixed inset-y-0 left-0 w-80 bg-[#1e1f20] border-r border-[#37393b] z-40 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col shadow-2xl">
+    <div class="h-16 px-4 flex items-center justify-between border-b border-[#282a2c] flex-shrink-0">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-full bg-[#8ab4f8]/10 text-[#8ab4f8] flex items-center justify-center">
+          <i class="fa-solid fa-clock-rotate-left text-sm"></i>
+        </div>
+        <span class="font-medium text-sm text-[#e3e3e3]">会话历史记录</span>
+      </div>
+      <button id="btn-close-drawer" class="w-8 h-8 rounded-full hover:bg-[#282a2c] text-[#8e918f] hover:text-[#e3e3e3] flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="p-3 border-b border-[#282a2c] flex-shrink-0">
+      <button id="btn-drawer-new-session" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-full bg-[#282a2c] hover:bg-[#313335] text-[#8ab4f8] hover:text-white border border-[#37393b] text-xs font-medium transition cursor-pointer shadow-sm">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>新建研发会话</span>
+      </button>
+    </div>
+
+    <!-- Sessions List -->
+    <div id="session-list" class="flex-1 overflow-y-auto p-3 space-y-1.5 select-text">
+      <div class="text-xs text-[#8e918f] text-center py-6">正在加载历史会话...</div>
+    </div>
+
+    <div class="p-3 border-t border-[#282a2c] text-[11px] text-[#8e918f] text-center flex-shrink-0">
+      已自动持久化至 <span class="font-mono text-[#8ab4f8]">.agent/sessions/</span>
+    </div>
+  </aside>
+
+  <!-- Drawer Backdrop -->
+  <div id="drawer-backdrop" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-30 transition-opacity duration-300"></div>
+
+  <!-- Settings Modal (Google Material 3 Dialog) -->
+  <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#1e1f20] border border-[#37393b] rounded-[28px] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-[#282a2c] px-6 py-4 flex-shrink-0">
+        <div class="flex items-center gap-2.5 text-[#e3e3e3] font-medium text-base">
+          <div class="w-8 h-8 rounded-full bg-[#8ab4f8]/10 text-[#8ab4f8] flex items-center justify-center">
+            <i class="fa-solid fa-sliders text-sm"></i>
+          </div>
+          <span>设置与模型库管理</span>
+        </div>
+        <button id="btn-close-settings" class="w-8 h-8 rounded-full hover:bg-[#282a2c] text-[#8e918f] hover:text-[#e3e3e3] flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+        
+        <!-- Section 1: Active Configuration -->
+        <div class="space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h4 class="text-[#8ab4f8] font-medium text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-microchip"></i> <span>当前激活模型配置 (实时生效并落盘)</span>
+            </h4>
+            <span id="active-profile-badge" class="px-2 py-0.5 rounded-full bg-[#8ab4f8]/10 text-[#8ab4f8] border border-[#8ab4f8]/20 font-mono text-[10px]">DeepSeek V3</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-[#c4c7c5] font-medium mb-1.5">API Base URL</label>
+              <input type="text" id="cfg-base-url" placeholder="https://api.deepseek.com/v1" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3.5 py-2.5 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8] select-text">
+            </div>
+            <div>
+              <label class="block text-[#c4c7c5] font-medium mb-1.5">API Key (留空表示沿用环境变量)</label>
+              <input type="password" id="cfg-api-key" placeholder="sk-..." class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3.5 py-2.5 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8] select-text">
+            </div>
+            <div>
+              <label class="block text-[#c4c7c5] font-medium mb-1.5">模型标识 (Model Identifier)</label>
+              <input type="text" id="cfg-model-name" placeholder="deepseek-chat / gpt-4o / gemini-1.5-pro" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3.5 py-2.5 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8] select-text">
+            </div>
+            <div>
+              <label class="block text-[#c4c7c5] font-medium mb-1.5">最大自主循环步数 (Max Steps)</label>
+              <input type="number" id="cfg-max-steps" value="15" min="1" max="50" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3.5 py-2.5 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8] select-text">
+            </div>
+          </div>
+          <div class="flex justify-end pt-1">
+            <button id="btn-save-settings" class="px-5 py-2 rounded-full bg-[#8ab4f8] hover:bg-[#a8c7fa] text-[#001d35] text-xs font-medium transition shadow-md cursor-pointer flex items-center gap-1.5">
+              <i class="fa-solid fa-floppy-disk text-[11px]"></i> <span>保存并应用当前配置</span>
+            </button>
+          </div>
+        </div>
+
+        <hr class="border-[#282a2c]">
+
+        <!-- Section: Pi Agent Style Provider Hub -->
+        <div class="space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h4 class="text-[#fdd663] font-medium text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-cloud-bolt"></i> <span>厂商直连与模型发现 (Provider Hub · 完整对标 Pi Agent 体系)</span>
+            </h4>
+            <span class="text-[10px] text-[#8e918f]">43+ 全球主流模型与云厂商全景接入</span>
+          </div>
+
+          <!-- Main Auth Type Switcher (Sign in with an API key vs Sign in with an account) -->
+          <div class="flex items-center gap-2 p-1 bg-[#131314] rounded-2xl border border-[#282a2c]">
+            <button type="button" id="tab-prov-apikey" class="flex-1 py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition bg-[#8ab4f8]/20 text-[#8ab4f8] border border-[#8ab4f8]/30 cursor-pointer shadow-sm">
+              <i class="fa-solid fa-key text-[11px]"></i>
+              <span>Sign in with an API key</span>
+              <span id="badge-apikey-count" class="text-[10px] px-1.5 py-0.2 rounded-full bg-[#8ab4f8]/20 text-[#8ab4f8]">34</span>
+            </button>
+            <button type="button" id="tab-prov-account" class="flex-1 py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition text-[#8e918f] hover:text-[#e3e3e3] hover:bg-[#1e1f20] cursor-pointer">
+              <i class="fa-solid fa-user-lock text-[11px]"></i>
+              <span>Sign in with an account</span>
+              <span id="badge-account-count" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-[#8e918f]">9</span>
+            </button>
+          </div>
+
+          <!-- Search and Category Filter Toolbar -->
+          <div class="space-y-2">
+            <!-- Search Bar -->
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-[#8e918f] text-xs"></i>
+              <input type="text" id="prov-search-input" placeholder="输入名称或模型快速过滤，例如 Qwen, Xiaomi, Z.AI, DeepSeek, Kimi..." class="w-full bg-[#131314] border border-[#37393b] rounded-xl pl-8 pr-4 py-2 text-xs text-[#e3e3e3] placeholder-[#8e918f] focus:outline-none focus:border-[#8ab4f8] select-text">
+            </div>
+
+            <!-- Provider Category Filter Pills -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]" id="provider-category-filters">
+              <button type="button" class="btn-filter-prov active px-2.5 py-1 rounded-full bg-[#8ab4f8]/20 text-[#8ab4f8] border border-[#8ab4f8]/30 font-medium transition cursor-pointer" data-cat="all">全部</button>
+              <button type="button" class="btn-filter-prov px-2.5 py-1 rounded-full bg-[#191a1b] hover:bg-[#282a2c] text-[#c4c7c5] border border-[#37393b] transition cursor-pointer" data-cat="china">国内前沿</button>
+              <button type="button" class="btn-filter-prov px-2.5 py-1 rounded-full bg-[#191a1b] hover:bg-[#282a2c] text-[#c4c7c5] border border-[#37393b] transition cursor-pointer" data-cat="global">国际主流</button>
+              <button type="button" class="btn-filter-prov px-2.5 py-1 rounded-full bg-[#191a1b] hover:bg-[#282a2c] text-[#c4c7c5] border border-[#37393b] transition cursor-pointer" data-cat="chips">极速芯片</button>
+              <button type="button" class="btn-filter-prov px-2.5 py-1 rounded-full bg-[#191a1b] hover:bg-[#282a2c] text-[#c4c7c5] border border-[#37393b] transition cursor-pointer" data-cat="local">本地/私有</button>
+              <button type="button" class="btn-filter-prov px-2.5 py-1 rounded-full bg-[#191a1b] hover:bg-[#282a2c] text-[#c4c7c5] border border-[#37393b] transition cursor-pointer" data-cat="gateway">聚合网关</button>
+            </div>
+          </div>
+
+          <!-- Provider Cards Grid (Dynamically rendered from /api/providers) -->
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1" id="provider-cards-grid">
+            <div class="col-span-full py-8 text-center text-xs text-[#8e918f]">
+              <i class="fa-solid fa-spinner fa-spin text-sm text-[#8ab4f8] mb-2"></i>
+              <div>正在加载官方厂商生态与模型矩阵...</div>
+            </div>
+          </div>
+
+          <!-- Dynamic Fetch Form & Models Discovery Panel (Unfolded on click) -->
+          <div id="provider-discovery-panel" class="hidden p-4 rounded-2xl bg-[#161718] border border-[#8ab4f8]/40 space-y-3.5 shadow-lg">
+            <div class="flex items-center justify-between border-b border-[#282a2c] pb-2.5">
+              <div class="flex items-center gap-2">
+                <span id="disc-provider-badge" class="px-2.5 py-1 rounded-xl bg-[#8ab4f8]/20 text-[#8ab4f8] font-semibold text-xs">DeepSeek</span>
+                <span class="text-xs text-[#e3e3e3] font-medium">厂商接口连接与模型发现</span>
+              </div>
+              <button id="btn-close-disc-panel" type="button" class="text-[#8e918f] hover:text-white text-xs cursor-pointer">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">API Base URL</label>
+                <input type="text" id="disc-base-url" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">API Key (Ollama 可留空)</label>
+                <input type="password" id="disc-api-key" placeholder="输入该厂商 API Key..." class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <span id="disc-status-hint" class="text-[11px] text-[#8e918f]">准备就绪，点击开始拉取</span>
+              <button id="btn-fetch-provider-models" type="button" class="px-4 py-1.5 rounded-full bg-[#8ab4f8] hover:bg-[#a8c7fa] text-[#001d35] font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer">
+                <i class="fa-solid fa-cloud-arrow-down"></i> <span>联网拉取最新可用模型</span>
+              </button>
+            </div>
+
+            <!-- Discovered Models List Container -->
+            <div id="disc-models-result" class="hidden space-y-2 pt-2 border-t border-[#282a2c]">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-medium text-[#81c995] flex items-center gap-1">
+                  <i class="fa-solid fa-list-check"></i> <span id="disc-found-count">已探测到 0 个可用模型</span>
+                </span>
+                <label class="flex items-center gap-1 text-[11px] text-[#c4c7c5] cursor-pointer">
+                  <input type="checkbox" id="disc-select-all" checked class="rounded border-[#37393b]"> <span>全选</span>
+                </label>
+              </div>
+
+              <div id="disc-models-list" class="max-h-48 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                <!-- Dynamically populated -->
+              </div>
+
+              <div class="flex justify-end gap-2 pt-2">
+                <button id="btn-import-disc-models" type="button" class="px-5 py-2 rounded-full bg-[#81c995] hover:bg-[#a8dab5] text-[#001d35] font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md">
+                  <i class="fa-solid fa-circle-check"></i> <span>一键全部添加到模型库并使用</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-[#282a2c]">
+
+        <!-- Section 2: Model Profiles Manager -->
+        <div class="space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h4 class="text-[#81c995] font-medium text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-layer-group"></i> <span>已配置模型库 (方便随时切换)</span>
+            </h4>
+            <button id="btn-toggle-add-model" class="text-xs text-[#8ab4f8] hover:underline flex items-center gap-1 cursor-pointer">
+              <i class="fa-solid fa-plus-circle"></i> <span>+ 添加新模型</span>
+            </button>
+          </div>
+
+          <!-- Profiles Cards Container -->
+          <div id="model-profiles-container" class="space-y-2 select-text">
+            <!-- Dynamically populated via JS -->
+          </div>
+
+          <!-- Add New Model Form (Collapsible) -->
+          <div id="add-model-panel" class="hidden p-4 rounded-2xl bg-[#191a1b] border border-[#37393b] space-y-3">
+            <h5 class="text-xs font-semibold text-[#e3e3e3] flex items-center gap-1.5">
+              <i class="fa-solid fa-plus text-[#8ab4f8]"></i> <span>添加自定义模型档案</span>
+            </h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">模型唯一标识 ID (如: claude-3-5 / qwen)</label>
+                <input type="text" id="new-model-id" placeholder="my-model" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">显示名称 (如: Claude 3.5 Sonnet)</label>
+                <input type="text" id="new-model-name" placeholder="自定义大模型" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">API Base URL</label>
+                <input type="text" id="new-model-url" placeholder="https://api.openai.com/v1" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">API Key</label>
+                <input type="password" id="new-model-key" placeholder="sk-..." class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">模型代码 (如: claude-3-5-sonnet-20241022)</label>
+                <input type="text" id="new-model-code" placeholder="gpt-4o" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+              <div>
+                <label class="block text-[#8e918f] text-[11px] mb-1">单任务最大步数</label>
+                <input type="number" id="new-model-steps" value="15" min="1" max="50" class="w-full bg-[#131314] border border-[#37393b] rounded-xl px-3 py-2 text-[#e3e3e3] font-mono focus:outline-none focus:border-[#8ab4f8]">
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-1">
+              <button id="btn-cancel-add-model" type="button" class="px-4 py-1.5 rounded-full hover:bg-[#282a2c] text-[#8e918f] hover:text-white transition cursor-pointer">取消</button>
+              <button id="btn-confirm-add-model" type="button" class="px-5 py-1.5 rounded-full bg-[#81c995] hover:bg-[#a8dab5] text-[#001d35] font-medium transition cursor-pointer">保存并加入模型库</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="border-t border-[#282a2c] px-6 py-3 bg-[#191a1b] flex items-center justify-between text-[11px] text-[#8e918f] flex-shrink-0">
+        <span>模型配置持久保存在工作区根目录 <strong class="font-mono text-[#8ab4f8]">config.json</strong></span>
+        <button id="btn-done-settings" class="px-5 py-2 rounded-full bg-[#282a2c] hover:bg-[#313335] text-[#e3e3e3] text-xs font-medium transition cursor-pointer">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

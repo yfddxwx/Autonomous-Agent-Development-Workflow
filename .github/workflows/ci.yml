@@ -1,0 +1,41 @@
+name: CI & Test Suite
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        go: [ '1.22' ]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go ${{ matrix.go }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+
+      - name: Verify Dependencies
+        run: go mod verify
+
+      - name: Run Unit & Integration Tests
+        run: go test -v -race ./...
+        if: matrix.os != 'windows-latest'
+
+      - name: Run Tests (Windows)
+        run: go test -v ./...
+        if: matrix.os == 'windows-latest'
+
+      - name: Build Binary
+        run: go build -v -ldflags="-s -w" -o dist/agent ./cmd/agent

@@ -60,6 +60,10 @@
 
 区别于传统基于 Python 堆叠数个 G 虚拟环境与 Node 复杂依赖的庞大框架，本项目通过 Go 原生 `//go:embed` 技术将全套现代化 Web 前端一体化嵌入，编译后仅为一个 **~9MB 的自包含单文件**，即下即用，秒级启动。
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="DevAgent Material 3 现代化研发界面" width="100%">
+</p>
+
 ---
 
 ## ✨ 核心特性

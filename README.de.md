@@ -60,6 +60,10 @@
 
 Im Gegensatz zu monolithischen Python-Frameworks mit gigantischen virtuellen Umgebungen kompiliert dieses Projekt zu einer **einzelnen ~9MB Binärdatei**, die ihre moderne Google Material 3 Web-UI direkt über Go's `//go:embed` beinhaltet.
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="DevAgent Web Interface" width="100%">
+</p>
+
 ---
 
 ## ✨ Hauptmerkmale

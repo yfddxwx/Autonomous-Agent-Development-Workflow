@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -648,24 +649,65 @@ func (s *Server) handleBrowseWorkspace(w http.ResponseWriter, r *http.Request) {
 	currentWs := s.sec.GetWorkspaceDir()
 	escapedWs := strings.ReplaceAll(currentWs, "'", "''")
 
-	// Trigger native Windows FolderBrowserDialog with explicit UTF-8 encoding and current workspace preselected
-	script := fmt.Sprintf(`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = '选择 Agent 工作空间目录'; $f.ShowNewFolderButton = $true; $f.SelectedPath = '%s'; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::WriteLine($f.SelectedPath) }`, escapedWs)
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
-	out, err := cmd.Output()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("无法唤起系统文件夹选择器: %v", err), http.StatusInternalServerError)
+	if runtime.GOOS == "windows" {
+		script := fmt.Sprintf(`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = '选择 Agent 工作空间目录'; $f.ShowNewFolderButton = $true; $f.SelectedPath = '%s'; if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::WriteLine($f.SelectedPath) }`, escapedWs)
+		cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+		out, err := cmd.Output()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("无法唤起系统文件夹选择器: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		selected := strings.TrimSpace(string(out))
+		if selected == "" {
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"status": "ok",
+			"path":   selected,
+		})
 		return
 	}
 
-	selected := strings.TrimSpace(string(out))
-	if selected == "" {
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
+	if runtime.GOOS == "darwin" {
+		script := `POSIX path of (choose folder with prompt "选择 Agent 工作空间目录")`
+		cmd := exec.Command("osascript", "-e", script)
+		out, err := cmd.Output()
+		if err != nil {
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
+			return
+		}
+		selected := strings.TrimSpace(string(out))
+		if selected == "" {
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"status": "ok",
+			"path":   selected,
+		})
 		return
 	}
 
+	// Linux / others: Try zenity if installed
+	if zenityPath, err := exec.LookPath("zenity"); err == nil && zenityPath != "" {
+		cmd := exec.Command(zenityPath, "--file-selection", "--directory", "--title=选择 Agent 工作空间目录")
+		out, err := cmd.Output()
+		if err == nil && strings.TrimSpace(string(out)) != "" {
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"status": "ok",
+				"path":   strings.TrimSpace(string(out)),
+			})
+			return
+		}
+	}
+
+	// Graceful fallback for headless/container/server environments
 	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-		"path":   selected,
+		"status": "unsupported",
+		"error":  "当前系统环境未安装图形化目录选择器，请在输入框中直接输入目标绝对路径",
 	})
 }
 

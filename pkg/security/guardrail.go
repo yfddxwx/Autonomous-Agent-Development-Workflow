@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -99,6 +100,46 @@ func (sm *SecurityManager) GetHITLManager() *HITLManager {
 	return sm.hitl
 }
 
+// isHostAbsolutePath determines whether cleanTarget is an intended host absolute path on Unix/Windows.
+func isHostAbsolutePath(cleanTarget, workspace string) bool {
+	if runtime.GOOS == "windows" {
+		return filepath.VolumeName(cleanTarget) != ""
+	}
+	if !filepath.IsAbs(cleanTarget) {
+		return false
+	}
+	// On Unix, check if it starts with the workspace itself
+	wsClean := filepath.Clean(workspace)
+	targetClean := filepath.Clean(cleanTarget)
+	if targetClean == wsClean || strings.HasPrefix(targetClean, wsClean+string(filepath.Separator)) {
+		return true
+	}
+
+	// Check if it starts with standard Unix system root directories
+	systemRoots := []string{
+		"/bin/", "/boot/", "/dev/", "/etc/", "/home/", "/lib/", "/lib64/",
+		"/media/", "/mnt/", "/opt/", "/proc/", "/root/", "/run/", "/sbin/",
+		"/srv/", "/sys/", "/tmp/", "/usr/", "/var/", "/Users/", "/Applications/",
+		"/Library/", "/System/", "/Volumes/", "/private/",
+	}
+	for _, sr := range systemRoots {
+		if strings.HasPrefix(targetClean, sr) || targetClean == strings.TrimSuffix(sr, "/") {
+			return true
+		}
+	}
+
+	// Check if it starts with the first segment of current workspace
+	wsParts := strings.Split(strings.TrimPrefix(wsClean, "/"), "/")
+	if len(wsParts) > 0 && wsParts[0] != "" {
+		firstRoot := "/" + wsParts[0] + "/"
+		if strings.HasPrefix(targetClean, firstRoot) || targetClean == "/"+wsParts[0] {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ValidatePath ensures the given path does not escape the workspace directory.
 func (sm *SecurityManager) ValidatePath(targetPath string) (string, error) {
 	if targetPath == "" {
@@ -112,21 +153,18 @@ func (sm *SecurityManager) ValidatePath(targetPath string) (string, error) {
 	cleanTarget := strings.TrimSpace(targetPath)
 	cleanTarget = strings.Trim(cleanTarget, `"'`)
 
-	// On Windows, if path is not absolute (does not start with drive letter C: or D:),
-	// strip leading '/' and '\' so e.g. "/index.html" is treated as relative to workspace,
-	// avoiding Go's filepath.Join treating it as volume root.
-	if !filepath.IsAbs(cleanTarget) {
-		cleanTarget = strings.TrimLeft(cleanTarget, "/\\")
-		if cleanTarget == "" {
-			cleanTarget = "."
-		}
-	}
-
+	// Determine if cleanTarget is an intended host absolute path.
+	// Common LLM outputs like "/index.html" or "/src/components/App.vue" are virtual root paths,
+	// so on both Windows and Unix they are converted to workspace-relative paths.
 	var fullPath string
-	if filepath.IsAbs(cleanTarget) {
+	if isHostAbsolutePath(cleanTarget, currentWorkspace) {
 		fullPath = filepath.Clean(cleanTarget)
 	} else {
-		fullPath = filepath.Clean(filepath.Join(currentWorkspace, cleanTarget))
+		trimmed := strings.TrimLeft(cleanTarget, "/\\")
+		if trimmed == "" {
+			trimmed = "."
+		}
+		fullPath = filepath.Clean(filepath.Join(currentWorkspace, trimmed))
 	}
 
 	// Case-insensitive prefix check for Windows compatibility

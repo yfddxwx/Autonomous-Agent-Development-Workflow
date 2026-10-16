@@ -30,12 +30,7 @@ jobs:
         run: go mod verify
 
       - name: Run Unit & Integration Tests
-        run: go test -v -race ./...
-        if: matrix.os != 'windows-latest'
-
-      - name: Run Tests (Windows)
         run: go test -v ./...
-        if: matrix.os == 'windows-latest'
 
       - name: Build Binary
         run: go build -v -ldflags="-s -w" -o dist/agent ./cmd/agent

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -326,7 +327,7 @@ func (t *CmdExecTool) Execute(ctx context.Context, args map[string]interface{}) 
 	defer cancel()
 
 	var cmd *exec.Cmd
-	if strings.Contains(strings.ToLower(os.Getenv("OS")), "windows") {
+	if runtime.GOOS == "windows" || strings.Contains(strings.ToLower(os.Getenv("OS")), "windows") {
 		psCmd := "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8; " + command
 		cmd = exec.CommandContext(execCtx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", psCmd)
 	} else {

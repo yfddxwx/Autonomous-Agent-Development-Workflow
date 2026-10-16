@@ -137,7 +137,7 @@ func TestCmdExecTool_Execution(t *testing.T) {
 
 	// Execute simple echo
 	out, err := cmdTool.Execute(ctx, map[string]interface{}{
-		"command":         "Write-Output 'Agent Test OK'",
+		"command":         "echo 'Agent Test OK'",
 		"timeout_seconds": float64(10),
 	})
 	if err != nil {

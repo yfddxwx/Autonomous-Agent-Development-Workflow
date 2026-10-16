@@ -60,6 +60,10 @@
 
 Pythonの巨大な仮想環境やNode.js依存関係を必要とする従来の重厚なフレームワークとは異なり、Go言語の `//go:embed` 機構によりモダンなWebインターフェースを完全内蔵。コンパイル後はわずか **約9MBの単一実行ファイル** となり、ダウンロード後即座に起動できます。
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="DevAgent Web Interface" width="100%">
+</p>
+
 ---
 
 ## ✨ 主な機能

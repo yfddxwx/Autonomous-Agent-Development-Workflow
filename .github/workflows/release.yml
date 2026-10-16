@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Build Multi-Platform Binaries
+        run: |
+          mkdir -p dist
+          # Windows AMD64 & ARM64
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/agent-windows-amd64.exe ./cmd/agent
+          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/agent-windows-arm64.exe ./cmd/agent
+          # Linux AMD64 & ARM64
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/agent-linux-amd64 ./cmd/agent
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/agent-linux-arm64 ./cmd/agent
+          # macOS Intel & Apple Silicon
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/agent-darwin-amd64 ./cmd/agent
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/agent-darwin-arm64 ./cmd/agent
+
+      - name: Generate SHA256 Checksums
+        working-directory: dist
+        run: |
+          sha256sum * > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          name: Release ${{ github.ref_name }}

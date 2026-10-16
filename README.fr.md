@@ -60,6 +60,10 @@
 
 Contrairement aux frameworks Python encombrants nécessitant des gigaoctets d'environnements virtuels et de modules npm, cet agent se compile en un **binaire unique d'environ 9 Mo**, intégrant directement son interface Web moderne inspirée de Google Material 3 et Gemini grâce à la directive `//go:embed`.
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="Interface Web DevAgent Material 3" width="100%">
+</p>
+
 ---
 
 ## ✨ Fonctionnalités clés

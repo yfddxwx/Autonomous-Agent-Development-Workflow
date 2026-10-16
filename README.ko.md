@@ -60,6 +60,10 @@
 
 Python의 거대한 가상 환경이나 복잡한 Node.js 의존성을 필요로 하지 않으며, Go의 `//go:embed` 기술을 통해 모던 웹 인터페이스를 단일 실행 파일에 완전히 포함하여 **약 9MB 단일 파일**로 배포됩니다.
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="DevAgent Web Interface" width="100%">
+</p>
+
 ---
 
 ## ✨ 핵심 기능

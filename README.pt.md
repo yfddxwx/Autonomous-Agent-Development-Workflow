@@ -60,6 +60,10 @@ O **Autonomous Agent Development Workflow** é um agente autônomo de desenvolvi
 
 Diferente de frameworks pesados em Python que exigem gigabytes de ambientes virtuais e dependências node, este agente é compilado em um **binário único de apenas ~9MB**, integrando toda a sua interface Web moderna inspirada no Google Material 3 e Gemini via a diretiva nativa `//go:embed`.
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="Interface Web DevAgent Material 3" width="100%">
+</p>
+
 ---
 
 ## ✨ Principais Funcionalidades

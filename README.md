@@ -60,6 +60,10 @@
 
 Unlike Python-heavy frameworks requiring gigabytes of virtual environments and node dependencies, this agent compiles into a **single ~9MB binary** with its entire Google Material 3 / Gemini-inspired web interface embedded directly via Go's `//go:embed`.
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="DevAgent Material 3 Web Interface" width="100%">
+</p>
+
 ---
 
 ## ✨ Key Features
